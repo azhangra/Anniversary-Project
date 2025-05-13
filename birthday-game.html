@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Ulang Tahun</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #111;
+      font-family: 'Courier New', monospace;
+    }
+    
+    #game-container {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      margin: 20px auto;
+      background-color: #000;
+      overflow: hidden;
+    }
+    
+    canvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+    
+    #start-screen, #level-complete, #game-complete {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      text-align: center;
+    }
+    
+    h1 {
+      color: #ff66aa;
+      text-shadow: 3px 3px 0px #550033;
+      font-size: 36px;
+      margin-bottom: 30px;
+    }
+    
+    h2 {
+      color: #66ff99;
+      text-shadow: 2px 2px 0px #005533;
+      font-size: 24px;
+    }
+    
+    button {
+      background-color: #ff66aa;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 18px;
+      margin-top: 20px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      border-radius: 4px;
+      box-shadow: 3px 3px 0px #550033;
+    }
+    
+    button:hover {
+      background-color: #ff99cc;
+    }
+    
+    .memory {
+      margin: 20px 0;
+      padding: 15px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+      max-width: 80%;
+    }
+    
+    #controls {
+      margin-top: 10px;
+      text-align: center;
+      color: #ccc;
+    }
+    
+    #level-info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 16px;
+      z-index: 10;
+    }
+    
+    #hearts {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      color: red;
+      font-size: 24px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="level-info">Level: 1</div>
+    <div id="hearts">❤️❤️❤️</div>
+    
+    <div id="start-screen">
+      <h1>Perjalanan Cinta Kita</h1>
+      <h2>Game Ulang Tahun Spesial</h2>
+      <p>Kumpulkan kenangan manis dalam perjalanan cinta kita!</p>
+      <div class="memory">
+        "Selamat Ulang Tahun, Istriku Tercinta!"
+      </div>
+      <button id="start-button">Mulai Permainan</button>
+      <div id="controls">
+        <p>Gunakan tombol ←→ untuk bergerak, tombol ↑ untuk melompat</p>
+      </div>
+    </div>
+    
+    <div id="level-complete" style="display: none;">
+      <h1>Level Selesai!</h1>
+      <div class="memory" id="level-memory"></div>
+      <button id="next-level-button">Level Berikutnya</button>
+    </div>
+    
+    <div id="game-complete" style="display: none;">
+      <h1>Selamat Ulang Tahun!</h1>
+      <h2>Perjalanan Cinta Kita Akan Terus Berlanjut</h2>
+      <div class="memory">
+        "Terima kasih untuk semua kenangan indah ini. Masih banyak petualangan yang menunggu kita!"
+      </div>
+      <button id="replay-button">Main Lagi</button>
+    </div>
+  </div>
+
+  <script>
+    // Canvas setup
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('game-container');
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    
+    // Game variables
+    let gameState = 'start';
+    let currentLevel = 1;
+    let lives = 3;
+    let memories = [];
+    
+    // Player
+    const player = {
+      x: 50,
+      y: 0,
+      width: 32,
+      height: 48,
+      speed: 5,
+      jumpForce: 12,
+      velocityY: 0,
+      isJumping: false,
+      direction: 'right',
+      character: 'player'
+    };
+    
+    // Arrays
+    const platforms = [];
+    const memoryItems = [];
+    
+    // Levels
+    const levels = [
+      {
+        platforms: [
+          { x: 0, y: 550, width: 300, height: 50 },
+          { x: 400, y: 500, width: 200, height: 50 },
+          { x: 650, y: 450, width: 150, height: 50 },
+          { x: 400, y: 350, width: 100, height: 50 },
+          { x: 200, y: 300, width: 150, height: 50 },
+          { x: 0, y: 200, width: 100, height: 50 }
+        ],
+        items: [
+          { x: 50, y: 150, collected: false },
+          { x: 250, y: 250, collected: false },
+          { x: 450, y: 300, collected: false },
+          { x: 700, y: 400, collected: false }
+        ],
+        memory: "Pertemuan pertama kita sangat berkesan. Senyummu menarik perhatianku sejak awal."
+      },
+      {
+        platforms: [
+          { x: 0, y: 550, width: 200, height: 50 },
+          { x: 300, y: 500, width: 150, height: 50 },
+          { x: 550, y: 450, width: 250, height: 50 },
+          { x: 350, y: 350, width: 100, height: 50 },
+          { x: 150, y: 250, width: 150, height: 50 },
+          { x: 400, y: 200, width: 100, height: 50 },
+          { x: 600, y: 150, width: 200, height: 50 }
+        ],
+        items: [
+          { x: 150, y: 200, collected: false },
+          { x: 400, y: 150, collected: false },
+          { x: 600, y: 100, collected: false },
+          { x: 700, y: 100, collected: false }
+        ],
+        memory: "Kencan pertama kita di taman itu, saat hujan tiba-tiba turun dan kita berlari mencari tempat berteduh."
+      },
+      {
+        platforms: [
+          { x: 0, y: 550, width: 150, height: 50 },
+          { x: 250, y: 500, width: 100, height: 50 },
+          { x: 450, y: 450, width: 100, height: 50 },
+          { x: 650, y: 400, width: 150, height: 50 },
+          { x: 500, y: 300, width: 100, height: 50 },
+          { x: 300, y: 250, width: 100, height: 50 },
+          { x: 100, y: 200, width: 100, height: 50 },
+          { x: 250, y: 150, width: 100, height: 50 },
+          { x: 400, y: 100, width: 400, height: 50 }
+        ],
+        items: [
+          { x: 100, y: 150, collected: false },
+          { x: 300, y: 100, collected: false },
+          { x: 500, y: 50, collected: false },
+          { x: 700, y: 50, collected: false }
+        ],
+        memory: "Hari pernikahan kita adalah momen paling bahagia dalam hidupku. Kau terlihat sangat cantik."
+      }
+    ];
+    
+    // Game controls
+    const keys = {
+      right: false,
+      left: false,
+      up: false
+    };
+    
+    // Event listeners
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowRight') keys.right = true;
+      if (e.key === 'ArrowLeft') keys.left = true;
+      if (e.key === 'ArrowUp') keys.up = true;
+    });
+    
+    window.addEventListener('keyup', function(e) {
+      if (e.key === 'ArrowRight') keys.right = false;
+      if (e.key === 'ArrowLeft') keys.left = false;
+      if (e.key === 'ArrowUp') keys.up = false;
+    });
+    
+    // Button listeners
+    document.getElementById('start-button').addEventListener('click', function() {
+      document.getElementById('start-screen').style.display = 'none';
+      gameState = 'playing';
+      loadLevel(currentLevel);
+    });
+    
+    document.getElementById('next-level-button').addEventListener('click', function() {
+      document.getElementById('level-complete').style.display = 'none';
+      currentLevel++;
+      if (currentLevel > levels.length) {
+        gameState = 'complete';
+        document.getElementById('game-complete').style.display = 'flex';
+      } else {
+        gameState = 'playing';
+        loadLevel(currentLevel);
+      }
+    });
+    
+    document.getElementById('replay-button').addEventListener('click', function() {
+      document.getElementById('game-complete').style.display = 'none';
+      gameState = 'playing';
+      currentLevel = 1;
+      lives = 3;
+      memories = [];
+      loadLevel(currentLevel);
+    });
+    
+    // Load level
+    function loadLevel(level) {
+      const levelData = levels[level - 1];
+      
+      // Reset player
+      player.x = 50;
+      player.y = 0;
+      player.velocityY = 0;
+      player.isJumping = false;
+      
+      // Switch character
+      player.character = level % 2 === 0 ? 'partner' : 'player';
+      
+      // Reset platforms
+      platforms.length = 0;
+      for (let platform of levelData.platforms) {
+        platforms.push(Object.assign({}, platform));
+      }
+      
+      // Reset memory items
+      memoryItems.length = 0;
+      for (let item of levelData.items) {
+        memoryItems.push(Object.assign({}, item));
+      }
+      
+      // Update display
+      document.getElementById('level-info').textContent = `Level: ${level}`;
+      updateHearts();
+    }
+    
+    // Update hearts
+    function updateHearts() {
+      let heartsDisplay = '';
+      for (let i = 0; i < lives; i++) {
+        heartsDisplay += '❤️';
+      }
+      document.getElementById('hearts').textContent = heartsDisplay;
+    }
+    
+    // Check collision
+    function checkCollision(obj1, obj2) {
+      return obj1.x < obj2.x + obj2.width &&
+             obj1.x + obj1.width > obj2.x &&
+             obj1.y < obj2.y + obj2.height &&
+             obj1.y + obj1.height > obj2.y;
+    }
+    
+    // Game loop
+    function gameLoop() {
+      // Clear canvas
+      ctx.fillStyle = '#87CEEB';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      if (gameState === 'playing') {
+        // Apply gravity
+        player.velocityY += 0.5;
+        player.y += player.velocityY;
+        
+        // Platform collision
+        let onGround = false;
+        for (let platform of platforms) {
+          if (player.y + player.height > platform.y &&
+              player.y + player.height < platform.y + platform.height + player.velocityY &&
+              player.x + player.width > platform.x &&
+              player.x < platform.x + platform.width) {
+            player.y = platform.y - player.height;
+            player.velocityY = 0;
+            onGround = true;
+          }
+        }
+        
+        // Jump
+        if (keys.up && onGround && !player.isJumping) {
+          player.velocityY = -player.jumpForce;
+          player.isJumping = true;
+        }
+        
+        if (onGround) {
+          player.isJumping = false;
+        }
+        
+        // Move
+        if (keys.right) {
+          player.x += player.speed;
+          player.direction = 'right';
+        } else if (keys.left) {
+          player.x -= player.speed;
+          player.direction = 'left';
+        }
+        
+        // Boundaries
+        if (player.x < 0) player.x = 0;
+        if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        
+        // Fall check
+        if (player.y > canvas.height) {
+          lives--;
+          updateHearts();
+          
+          if (lives <= 0) {
+            lives = 3;
+            currentLevel = 1;
+            loadLevel(currentLevel);
+          } else {
+            player.x = 50;
+            player.y = 0;
+            player.velocityY = 0;
+          }
+        }
+        
+        // Collect items
+        for (let i = 0; i < memoryItems.length; i++) {
+          if (!memoryItems[i].collected &&
+              checkCollision(player, {
+                x: memoryItems[i].x,
+                y: memoryItems[i].y,
+                width: 30,
+                height: 30
+              })) {
+            memoryItems[i].collected = true;
+          }
+        }
+        
+        // Level complete check
+        const allCollected = memoryItems.every(item => item.collected);
+        if (allCollected) {
+          gameState = 'levelComplete';
+          memories.push(levels[currentLevel - 1].memory);
+          
+          document.getElementById('level-memory').textContent = levels[currentLevel - 1].memory;
+          document.getElementById('level-complete').style.display = 'flex';
+        }
+      }
+      
+      // Draw platforms
+      ctx.fillStyle = '#996633';
+      for (let platform of platforms) {
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+        
+        // Grass on top
+        ctx.fillStyle = '#66CC66';
+        ctx.fillRect(platform.x, platform.y, platform.width, 10);
+        ctx.fillStyle = '#996633';
+      }
+      
+      // Draw items
+      ctx.fillStyle = '#FF66AA';
+      for (let item of memoryItems) {
+        if (!item.collected) {
+          // Heart shape
+          const x = item.x + 15;
+          const y = item.y + 15;
+          const size = 15;
+          
+          ctx.beginPath();
+          ctx.moveTo(x, y + size * 0.25);
+          ctx.bezierCurveTo(
+            x, y, 
+            x - size, y, 
+            x - size, y + size * 0.75
+          );
+          ctx.bezierCurveTo(
+            x - size, y + size * 1.25, 
+            x, y + size * 1.5, 
+            x, y + size * 2
+          );
+          ctx.bezierCurveTo(
+            x, y + size * 1.5, 
+            x + size, y + size * 1.25, 
+            x + size, y + size * 0.75
+          );
+          ctx.bezierCurveTo(
+            x + size, y, 
+            x, y, 
+            x, y + size * 0.25
+          );
+          ctx.closePath();
+          ctx.fill();
+          
+          // Sparkle
+          const time = new Date().getTime() / 1000;
+          const sparkle = Math.sin(time * 4) * 0.5 + 0.5;
+          
+          ctx.fillStyle = `rgba(255, 255, 255, ${sparkle})`;
+          ctx.beginPath();
+          ctx.arc(x, y, 5, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.fillStyle = '#FF66AA';
+        }
+      }
+      
+      // Draw player
+      ctx.fillStyle = player.character === 'player' ? '#5588FF' : '#FF55AA';
+      
+      // Draw body
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+      
+      // Draw eyes
+      ctx.fillStyle = 'white';
+      if (player.direction === 'right') {
+        ctx.fillRect(player.x + 20, player.y + 10, 8, 8);
+      } else {
+        ctx.fillRect(player.x + 4, player.y + 10, 8, 8);
+      }
+      
+      // Request next frame
+      requestAnimationFrame(gameLoop);
+    }
+    
+    // Start the game
+    gameLoop();
+  </script>
+</body>
+</html>
